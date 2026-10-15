@@ -93,4 +93,24 @@ class SusuGroup:
 
     def paid_in_full(self) -> list:
         return [m for m in self._members if self._paid[m] == self.weekly_amount]
-    
+       
+        # ---- closing a week ----
+    def next_recipient(self) -> str | None:
+        if self.is_complete:
+            return None
+        return self._members[len(self.payouts)]
+
+    def close_week(self) -> CloseResult:
+        if not self._members:
+            raise StateError("Add at least one member before closing a week.")
+        if self.is_complete:
+            raise StateError("The cycle is complete; there are no more weeks.")
+        owing = self.outstanding()
+        if owing:
+            return CloseResult(False, None, owing)
+        payout = Payout(self.current_week, self.next_recipient(), self.pot)
+        self.payouts.append(payout)
+        if not self.is_complete:
+            self.current_week += 1
+        self._paid = {m: Decimal("0.00") for m in self._members}
+        return CloseResult(True, payout, {})
