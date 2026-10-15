@@ -114,3 +114,26 @@ class SusuGroup:
             self.current_week += 1
         self._paid = {m: Decimal("0.00") for m in self._members}
         return CloseResult(True, payout, {})
+
+        # ---- persistence ----
+    def to_dict(self) -> dict:
+        return {
+            "weekly_amount": str(self.weekly_amount),
+            "members": list(self._members),
+            "paid": {m: str(v) for m, v in self._paid.items()},
+            "current_week": self.current_week,
+            "payouts": [{"week": p.week, "member": p.member, "amount": str(p.amount)}
+                        for p in self.payouts],
+            "started": self._started,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SusuGroup":
+        group = cls(data["weekly_amount"])
+        group._members = list(data["members"])
+        group._paid = {m: Decimal(v) for m, v in data["paid"].items()}
+        group.current_week = data["current_week"]
+        group.payouts = [Payout(p["week"], p["member"], Decimal(p["amount"]))
+                         for p in data["payouts"]]
+        group._started = data["started"]
+        return group
