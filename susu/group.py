@@ -60,3 +60,37 @@ class SusuGroup:
         self._members.append(clean)  # join order = payout order
         self._paid[clean] = Decimal("0.00")
         return clean
+        # ---- contributions ----
+    @property
+    def is_complete(self) -> bool:
+        return bool(self._members) and len(self.payouts) == len(self._members)
+
+    def owed_by(self, name: str) -> Decimal:
+        return self.weekly_amount - self._paid[self._find(name)]
+
+    def record_contribution(self, name: str, amount, week: int | None = None) -> Decimal:
+        """Record a (possibly partial) payment. Returns what the member still owes."""
+        if self.is_complete:
+            raise StateError("The cycle is complete; every member has been paid.")
+        member = self._find(name)
+        value = parse_money(amount)
+        if value <= 0:
+            raise ValidationError("Amount must be greater than zero.")
+        if week is not None and week != self.current_week:
+            raise ValidationError(
+                f"Only the current week ({self.current_week}) accepts contributions.")
+        owed = self.weekly_amount - self._paid[member]
+        if value > owed:
+            raise ValidationError(
+                f"{member} only owes GHS {fmt(owed)} this week; cannot pay GHS {fmt(value)}.")
+        self._paid[member] += value
+        self._started = True
+        return self.weekly_amount - self._paid[member]
+
+    def outstanding(self) -> dict:
+        return {m: self.weekly_amount - p
+                for m, p in self._paid.items() if p < self.weekly_amount}
+
+    def paid_in_full(self) -> list:
+        return [m for m in self._members if self._paid[m] == self.weekly_amount]
+    
